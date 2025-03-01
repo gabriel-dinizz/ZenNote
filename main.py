@@ -4,30 +4,39 @@ from typing import Annotated
 from typing_extensions import deprecated
 
 import jwt
+from jwt.exceptions import InvalidTokenError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from typing import Optional
+import bcrypt
+print(bcrypt.__version__)
 
 SECRET_KEY = "030556cdab7821d6cbd82af841749f8464e4bea70c809dbf5b058f71462a2143"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+hashed_password_1 = pwd_context.hash("password123")
+hashed_password_2 = pwd_context.hash("secret456")
+
+print("Gabriel Diniz hashed password", hashed_password_1)
+print("rafael hashed password", hashed_password_2)
 
 fake_users_db = {
     "gabrieldiniz": {
         "username": "gabrieldiniz",
         "full_name": "Gabriel Diniz Cremel",
         "email": "gabrieldiniz@exemplo.com",
-        "hashed_password": "fakehashedpassword123",
+        "hashed_password": "$2b$12$S2yfWKYwakLC2OH2NRtYzuuuuAfiD.XCSE2Fgy2s13cE0geCkBqZ.",
         "disabled": False,
     },
     "rafael": {
         "username": "rafael",
         "full_name": "Rafael Gomes",
         "email": "raf@gmail.com",
-        "hashed_password": "fakehashedpassword456",
+        "hashed_password": "$2b$12$2pHJWI/hZl1SYoZporbaGeSLJ4J/PgvEdbKwnfjFPozTYzmEdUKdq",
         "disabled": True,
     },
 }
@@ -65,7 +74,7 @@ def verify_password(plain_password, hashed_password):
 
 
 def get_password_hash(password):
-    return pwd_context(password)
+    return pwd_context.hash(password)
 
 
 def get_user(db, username: str):
@@ -83,25 +92,35 @@ def authenticate_user(fake_db, username: str, password: str):
     return user
 
 
-def create_acces_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datatime.now(timezone.utc) + expires_delta
-    else:
         expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     """Validates and returns the user from the token"""
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except InvalidTokenError:
+        raise credentials_exception
+    user = get_user(fake_users_db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
     return user
 
 
@@ -115,24 +134,32 @@ async def get_current_active_user(
 
 
 @app.post("/token")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    """Authenticates the user and returns an access token"""
-    user_dict = fake_users_db.get(form_data.username)
-    if not user_dict:
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+) -> Token:
+    user = authenticate_user(
+        fake_users_db, form_data.username, form_data.password)
+    if not user:
         raise HTTPException(
-            status_code=400, detail="Incorrect username or password")
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return Token(access_token=access_token, token_type="bearer")
 
-    user = UserInDB(**user_dict)
-    hashed_password = fake_hash_password(form_data.password)
 
-    if hashed_password != user.hashed_password:  # Fixed password comparison
-        raise HTTPException(
-            status_code=400, detail="Incorrect username or password")
-
-    return {"access_token": user.username, "token_type": "bearer"}
-
-
-@app.get("/users/me")
+@app.get("/users/me/", response_model=User)
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
-    """Returns the authenticated user's details"""
     return current_user
+
+
+@app.get("/users/me/items/")
+async def read_own_items(
+        current_user: Annotated[User, Depends(get_current_active_user)],
+
+):
+    return [{"item_id": "Foo", "owner": current_user.username}]
