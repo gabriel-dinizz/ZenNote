@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zen Note</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- EB Garamond Font -->
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .font-garamond {
+            font-family: 'EB Garamond', serif;
+        }
+    </style>
+</head>
+<body class="bg-orange-100 min-h-screen flex flex-col items-start justify-start pt-16 font-garamond">
+    <div class="w-full max-w-4xl mx-auto px-4">
+        <div class="text-center w-full mb-16">
+            <a href="#" class="text-3xl font-semibold text-blue-500 hover:text-blue-700 inline-block">[Zen Note]</a>
+        </div>
+        
+        <div class="flex flex-row justify-center gap-8 w-full">
+            <a href="/register" class="text-blue-600 hover:text-blue-800 px-6 py-2 transition">
+                Register
+            </a>
+            <a href="/login" class="text-blue-600 hover:text-blue-800 px-6 py-2 transition">
+                Login
+            </a>
+            <a href="/notes" class="text-blue-600 hover:text-blue-800 px-6 py-2 transition">
+                Continue as Guest
+            </a>
+        </div>
+    </div>
+</body>
+</html>

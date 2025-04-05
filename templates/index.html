@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zen Note</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- EB Garamond Font -->
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .font-garamond {
+            font-family: 'EB Garamond', serif;
+        }
+        .sidebar-item {
+            transition: background-color 0.2s;
+        }
+        .sidebar-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .sidebar-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="font-garamond flex h-screen overflow-hidden">
+    <!-- Sidebar Navigation -->
+    <div class="w-64 bg-gray-900 text-gray-300 flex flex-col h-screen">
+        <!-- App Title -->
+        <div class="p-4 border-b border-gray-700">
+            <a href="/" class="text-xl font-semibold text-blue-400 hover:text-blue-300">[Zen Note]</a>
+        </div>
+        
+        <!-- Folders Section -->
+        <div class="p-4 border-b border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-gray-400 font-semibold tracking-wider">FOLDERS</h2>
+                <div class="flex">
+                    <button class="text-gray-400 hover:text-white px-1">◀</button>
+                    <button class="text-gray-400 hover:text-white px-1">▶</button>
+                </div>
+            </div>
+            
+            <!-- Folder Tree -->
+            <div class="space-y-1">
+                <!-- Expanded Folder -->
+                <div class="flex items-center hover:text-white sidebar-item p-1 active">
+                    <span class="mr-1">▼</span>
+                    <span class="mr-2">📁</span>
+                    <span>Notes</span>
+                </div>
+                
+                <!-- Nested Items (indented) -->
+                <div class="pl-5 space-y-1">
+                    <div class="flex items-center hover:text-white sidebar-item p-1">
+                        <span class="mr-2">📝</span>
+                        <span>Work</span>
+                    </div>
+                    <div class="flex items-center hover:text-white sidebar-item p-1">
+                        <span class="mr-2">📝</span>
+                        <span>Personal</span>
+                    </div>
+                </div>
+                
+                <!-- Collapsed Folder -->
+                <div class="flex items-center hover:text-white sidebar-item p-1">
+                    <span class="mr-1">►</span>
+                    <span class="mr-2">📁</span>
+                    <span>Archive</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notes Section -->
+        <div class="flex-1 overflow-y-auto">
+            <div class="p-4 border-b border-gray-700">
+                <h2 class="text-gray-400 font-semibold tracking-wider">MY NOTES</h2>
+            </div>
+            
+            <div class="space-y-1 p-2">
+                <div class="flex items-center hover:text-white sidebar-item p-2 active">
+                    <span class="mr-2">📄</span>
+                    <span>Meeting notes</span>
+                </div>
+                <div class="flex items-center hover:text-white sidebar-item p-2">
+                    <span class="mr-2">📄</span>
+                    <span>Shopping list</span>
+                </div>
+                <div class="flex items-center hover:text-white sidebar-item p-2">
+                    <span class="mr-2">📄</span>
+                    <span>Project ideas</span>
+                </div>
+                <div class="flex items-center hover:text-white sidebar-item p-2">
+                    <span class="mr-2">📄</span>
+                    <span>Reading list</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- User Section -->
+        <div class="p-3 border-t border-gray-700 flex items-center">
+            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-2">
+                <span>U</span>
+            </div>
+            <span>Username</span>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col bg-orange-50">
+        <!-- Top Bar -->
+        <div class="bg-orange-100 p-4 border-b border-gray-200 flex justify-between items-center">
+            <div class="flex items-center">
+                <h1 class="text-xl">Meeting notes</h1>
+            </div>
+            <div class="flex space-x-4">
+                <button class="text-blue-600 hover:text-blue-800">Save</button>
+                <button class="text-blue-600 hover:text-blue-800">Share</button>
+            </div>
+        </div>
+        
+        <!-- Note Editor -->
+        <div class="flex-1 flex flex-col p-6 overflow-auto">
+            <input 
+                type="text" 
+                placeholder="Title" 
+                value="Meeting notes" 
+                class="text-2xl font-semibold mb-4 bg-transparent border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-500"
+            >
+            
+            <textarea 
+                placeholder="Start writing your note here..." 
+                class="flex-1 bg-transparent resize-none focus:outline-none leading-relaxed"
+            >Team meeting - April 5, 2025
+
+Attendees:
+- John Doe
+- Jane Smith
+- Bob Johnson
+
+Agenda:
+1. Project status update
+2. New feature discussion
+3. Timeline review
+
+Notes:
+- Project is on track for May delivery
+- Need to prioritize mobile optimization
+- Budget approval pending for new server costs
+
+Action Items:
+- John: Send updated timeline by Monday
+- Jane: Finalize design mockups
+- Bob: Research cost-saving alternatives for hosting
+            </textarea>
+        </div>
+    </div>
+</body>
+</html>
