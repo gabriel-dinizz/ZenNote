@@ -9,6 +9,13 @@ app.secret_key = os.urandom(24)  # For session management
 
 # Create DB if not exists
 def init_db():
+    """
+    Initializes the SQLite database by creating the necessary tables if they do not already exist.
+    Tables:
+        - users: Stores user authentication details (id, username, password, email).
+        - notes: Stores user notes with a reference to the user who owns the note.
+        - folders: Stores folder information for organizing notes, with support for nested folders.
+    """
     with sqlite3.connect("notes.db") as conn:
         # Users table for authentication
         conn.execute("""
@@ -49,9 +56,11 @@ def init_db():
 # Main routes
 @app.route("/")
 def index():
+    # If already logged in, go to the notes
     if 'user_id' in session:
         return redirect("/notes")
-    return redirect("/login")
+    # Otherwise, show the landing/menu page
+    return render_template("index.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -75,7 +84,7 @@ def login():
         else:
             flash("Invalid username or password")
             
-    return render_template("menu.html")
+    return render_template("login.html")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -112,32 +121,53 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect("/")
+
+
+@app.route("/guest")
+def guest_access():
+    # Set up a guest session
+    session.clear()  # Clear any existing session
+    session['guest'] = True
+    session['username'] = 'Guest'
+    
+    return redirect("/notes")
 
 
 @app.route("/notes")
 def notes():
-    if 'user_id' not in session:
-        # Redirect to login if not logged in
-        flash("Please log in to access your notes")
-        return redirect("/login")
+    # Allow access for both logged-in users and guests
+    if 'user_id' not in session and 'guest' not in session:
+        flash("Please log in or continue as guest")
+        return redirect("/")
     
-    return render_template("editor.html", username=session.get('username', 'User'))
+    username = session.get('username', 'Guest')
+    return render_template("editor.html", username=username)
 
 
-# Provide a separate route for landing page if needed
-@app.route("/welcome")
-def welcome():
-    return render_template("index.html")
-
-
-# API Routes for AJAX calls
+# API Routes for AJAX calls - Modified to work with guest sessions
 
 @app.route("/api/notes", methods=["GET"])
 def get_notes():
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
+    # For guests, return empty list or demo notes
+    if 'guest' in session:
+        # Option 1: Return empty list for guests
+        # return jsonify([])
+        
+        # Option 2: Return demo notes for guests
+        return jsonify([{
+            "id": 0,
+            "title": "Welcome to Zen Note",
+            "content": "This is a demo note in guest mode. Note that your changes won't be saved permanently in guest mode.",
+            "folder": None,
+            "created_at": "2025-04-07 12:00:00"
+        }])
+    
+    # For logged-in users, fetch from database
     user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
@@ -155,14 +185,27 @@ def get_notes():
 
 @app.route("/api/notes", methods=["POST"])
 def create_note():
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
     data = request.get_json()
-    user_id = session['user_id']
     title = data.get('title', 'Untitled')
     content = data.get('content', '')
     folder = data.get('folder', None)
+    
+    # For guests, return a mock response (no database saving)
+    if 'guest' in session:
+        return jsonify({
+            "id": -1,  # Negative ID to indicate temporary note
+            "title": title,
+            "content": content,
+            "folder": folder,
+            "guest_note": True
+        })
+    
+    # For logged-in users, save to database
+    user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
         cursor = conn.cursor()
@@ -182,9 +225,23 @@ def create_note():
 
 @app.route("/api/notes/<int:note_id>", methods=["GET"])
 def get_note(note_id):
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
+    # For guests, return a mock response if requesting the demo note
+    if 'guest' in session:
+        if note_id == 0:  # The demo note ID
+            return jsonify({
+                "id": 0,
+                "title": "Welcome to Zen Note",
+                "content": "This is a demo note in guest mode. Note that your changes won't be saved permanently in guest mode.",
+                "folder": None,
+                "created_at": "2025-04-07 12:00:00"
+            })
+        return jsonify({"error": "Note not found"}), 404
+    
+    # For logged-in users, fetch from database
     user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
@@ -202,14 +259,25 @@ def get_note(note_id):
 
 @app.route("/api/notes/<int:note_id>", methods=["PUT"])
 def update_note(note_id):
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
     data = request.get_json()
-    user_id = session['user_id']
     title = data.get('title')
     content = data.get('content')
     folder = data.get('folder')
+    
+    # For guests, return success but don't save anything
+    if 'guest' in session:
+        return jsonify({
+            "success": True,
+            "guest_note": True,
+            "message": "Note updated in guest mode (changes not saved permanently)"
+        })
+    
+    # For logged-in users, update in database
+    user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
         conn.execute("""
@@ -223,9 +291,19 @@ def update_note(note_id):
 
 @app.route("/api/notes/<int:note_id>", methods=["DELETE"])
 def delete_note(note_id):
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
+    # For guests, return success but don't delete anything
+    if 'guest' in session:
+        return jsonify({
+            "success": True,
+            "guest_note": True,
+            "message": "Note deleted in guest mode"
+        })
+    
+    # For logged-in users, delete from database
     user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
@@ -237,9 +315,23 @@ def delete_note(note_id):
 
 @app.route("/api/folders", methods=["GET"])
 def get_folders():
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
+    # For guests, return empty list or demo folders
+    if 'guest' in session:
+        # Option 1: Return empty list for guests
+        return jsonify([])
+        
+        # Option 2: Return demo folders for guests
+        # return jsonify([{
+        #    "id": 0,
+        #    "name": "Demo Folder",
+        #    "parent_id": None
+        # }])
+    
+    # For logged-in users, fetch from database
     user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
@@ -257,13 +349,25 @@ def get_folders():
 
 @app.route("/api/folders", methods=["POST"])
 def create_folder():
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
     data = request.get_json()
-    user_id = session['user_id']
     name = data.get('name', 'New Folder')
     parent_id = data.get('parent_id')
+    
+    # For guests, return a mock response
+    if 'guest' in session:
+        return jsonify({
+            "id": -1,  # Negative ID to indicate temporary folder
+            "name": name,
+            "parent_id": parent_id,
+            "guest_folder": True
+        })
+    
+    # For logged-in users, save to database
+    user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
         cursor = conn.cursor()
@@ -282,13 +386,24 @@ def create_folder():
 
 @app.route("/api/folders/<int:folder_id>", methods=["PUT"])
 def update_folder(folder_id):
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
     data = request.get_json()
-    user_id = session['user_id']
     name = data.get('name')
     parent_id = data.get('parent_id')
+    
+    # For guests, return success but don't save anything
+    if 'guest' in session:
+        return jsonify({
+            "success": True,
+            "guest_folder": True,
+            "message": "Folder updated in guest mode (changes not saved permanently)"
+        })
+    
+    # For logged-in users, update in database
+    user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
         conn.execute("""
@@ -302,9 +417,19 @@ def update_folder(folder_id):
 
 @app.route("/api/folders/<int:folder_id>", methods=["DELETE"])
 def delete_folder(folder_id):
-    if 'user_id' not in session:
+    # Check if user is logged in or a guest
+    if 'user_id' not in session and 'guest' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
+    # For guests, return success but don't delete anything
+    if 'guest' in session:
+        return jsonify({
+            "success": True,
+            "guest_folder": True,
+            "message": "Folder deleted in guest mode"
+        })
+    
+    # For logged-in users, delete from database
     user_id = session['user_id']
     
     with sqlite3.connect("notes.db") as conn:
