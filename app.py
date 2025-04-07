@@ -51,11 +51,15 @@ def init_db():
 def index():
     if 'user_id' in session:
         return redirect("/notes")
-    return render_template("index.html")
+    return redirect("/login")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # If user is already logged in, redirect to notes
+    if 'user_id' in session:
+        return redirect("/notes")
+        
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -71,11 +75,15 @@ def login():
         else:
             flash("Invalid username or password")
             
-    return render_template("login.html")
+    return render_template("menu.html")
 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    # If user is already logged in, redirect to notes
+    if 'user_id' in session:
+        return redirect("/notes")
+        
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -104,15 +112,23 @@ def register():
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/")
+    return redirect("/login")
 
 
 @app.route("/notes")
 def notes():
     if 'user_id' not in session:
+        # Redirect to login if not logged in
+        flash("Please log in to access your notes")
         return redirect("/login")
     
-    return render_template("editor.html")
+    return render_template("editor.html", username=session.get('username', 'User'))
+
+
+# Provide a separate route for landing page if needed
+@app.route("/welcome")
+def welcome():
+    return render_template("index.html")
 
 
 # API Routes for AJAX calls
